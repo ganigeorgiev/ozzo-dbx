@@ -114,6 +114,7 @@ func MustOpen(driverName, dsn string) (*DB, error) {
 		return nil, err
 	}
 	if err := db.sqlDB.Ping(); err != nil {
+		db.Close()
 		return nil, err
 	}
 	return db, nil
