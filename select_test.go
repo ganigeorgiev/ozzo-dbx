@@ -23,6 +23,8 @@ func TestSelectQuery(t *testing.T) {
 
 	// a full select query
 	q = db.Select("id", "name").
+		PreFragment("pre").
+		PostFragment("post").
 		AndSelect("age").
 		Distinct(true).
 		SelectOption("CALC").
@@ -46,7 +48,7 @@ func TestSelectQuery(t *testing.T) {
 		AndBind(Params{"age": 30}).
 		Build()
 
-	expected = "SELECT DISTINCT CALC `id`, `name`, `age` FROM `users` INNER JOIN `profile` ON user.id=profile.id LEFT JOIN `team` RIGHT JOIN `dept` WHERE ((age>30) AND (status=1)) OR (type=2) GROUP BY `id`, `age` HAVING ((id>10) AND (id<20)) OR (type=3) ORDER BY `age` DESC, `type`, `id` LIMIT 10 OFFSET 20"
+	expected = "pre SELECT DISTINCT CALC `id`, `name`, `age` FROM `users` INNER JOIN `profile` ON user.id=profile.id LEFT JOIN `team` RIGHT JOIN `dept` WHERE ((age>30) AND (status=1)) OR (type=2) GROUP BY `id`, `age` HAVING ((id>10) AND (id<20)) OR (type=3) ORDER BY `age` DESC, `type`, `id` LIMIT 10 OFFSET 20 post"
 	assert.Equal(t, q.SQL(), expected, "t3")
 	assert.Equal(t, len(q.Params()), 2, "t4")
 
@@ -54,10 +56,10 @@ func TestSelectQuery(t *testing.T) {
 	assert.Equal(t, len(q3.Params()), 1)
 
 	// union
-	q1 := db.Select().From("users").Build()
-	q2 := db.Select().From("posts").Build()
-	q = db.Select().From("profiles").Union(q1).UnionAll(q2).Build()
-	expected = "(SELECT * FROM `profiles`) UNION (SELECT * FROM `users`) UNION ALL (SELECT * FROM `posts`)"
+	q1 := db.Select().From("users").PreFragment("pre_q1").Build()
+	q2 := db.Select().From("posts").PostFragment("post_q2").Build()
+	q = db.Select().From("profiles").Union(q1).UnionAll(q2).PreFragment("pre").PostFragment("post").Build()
+	expected = "(pre SELECT * FROM `profiles` post) UNION (pre_q1 SELECT * FROM `users`) UNION ALL (SELECT * FROM `posts` post_q2)"
 	assert.Equal(t, q.SQL(), expected, "t5")
 }
 

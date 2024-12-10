@@ -25,6 +25,8 @@ type SelectQuery struct {
 	ctx       context.Context
 	buildHook BuildHookFunc
 
+	preFragment  string
+	postFragment string
 	selects      []string
 	distinct     bool
 	selectOption string
@@ -86,6 +88,18 @@ func (q *SelectQuery) Context() context.Context {
 func (q *SelectQuery) WithContext(ctx context.Context) *SelectQuery {
 	q.ctx = ctx
 	return q
+}
+
+// PreFragment sets SQL fragment that should be prepended before the select query (e.g. WITH clause).
+func (s *SelectQuery) PreFragment(fragment string) *SelectQuery {
+	s.preFragment = fragment
+	return s
+}
+
+// PostFragment sets SQL fragment that should be appended at the end of the select query.
+func (s *SelectQuery) PostFragment(fragment string) *SelectQuery {
+	s.postFragment = fragment
+	return s
 }
 
 // Select specifies the columns to be selected.
@@ -265,6 +279,7 @@ func (s *SelectQuery) Build() *Query {
 	qb := s.builder.QueryBuilder()
 
 	clauses := []string{
+		s.preFragment,
 		qb.BuildSelect(s.selects, s.distinct, s.selectOption),
 		qb.BuildFrom(s.from),
 		qb.BuildJoin(s.join, params),
@@ -272,6 +287,7 @@ func (s *SelectQuery) Build() *Query {
 		qb.BuildGroupBy(s.groupBy),
 		qb.BuildHaving(s.having, params),
 	}
+
 	sql := ""
 	for _, clause := range clauses {
 		if clause != "" {
@@ -282,7 +298,13 @@ func (s *SelectQuery) Build() *Query {
 			}
 		}
 	}
+
 	sql = qb.BuildOrderByAndLimit(sql, s.orderBy, s.limit, s.offset)
+
+	if s.postFragment != "" {
+		sql += " " + s.postFragment
+	}
+
 	if union := qb.BuildUnion(s.union, params); union != "" {
 		sql = fmt.Sprintf("(%v) %v", sql, union)
 	}
@@ -377,6 +399,8 @@ func (s *SelectQuery) Column(a interface{}) error {
 
 // QueryInfo represents a debug/info struct with exported SelectQuery fields.
 type QueryInfo struct {
+	PreFragment  string
+	PostFragment string
 	Builder      Builder
 	Selects      []string
 	Distinct     bool
@@ -400,6 +424,8 @@ type QueryInfo struct {
 func (s *SelectQuery) Info() *QueryInfo {
 	return &QueryInfo{
 		Builder:      s.builder,
+		PreFragment:  s.preFragment,
+		PostFragment: s.postFragment,
 		Selects:      s.selects,
 		Distinct:     s.distinct,
 		SelectOption: s.selectOption,
